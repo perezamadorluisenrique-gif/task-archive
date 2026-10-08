@@ -1,0 +1,10 @@
+{
+  "id": "task-archive",
+  "name": "Task Archive",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.4",
+  "description": "Moves completed tasks, with their sub-items, into an archive section or note.",
+  "author": "Siulved54",
+  "authorUrl": "https://github.com/perezamadorluisenrique-gif",
+  "isDesktopOnly": false
+}
