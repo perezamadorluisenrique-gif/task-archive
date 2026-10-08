@@ -246,17 +246,31 @@ function afterLine(lines: Line[], i: number, add: string): Change {
   return { from: at, to: at, insert: `\n${add}` };
 }
 
-/** The edits that cut these blocks out of the note. */
+/** The edits that cut these blocks out of the note. Ranges that touch or overlap are merged. */
 export function planRemoval(text: string, blocks: Block[], lines: Line[] = splitLines(text)): Change[] {
-  return blocks.map((b) => {
+  const ranges = blocks.map((b) => {
     const from = lines[b.start].offset;
     const last = lines[b.end - 1];
     let to = last.offset + last.text.length;
     if (text[to] === '\n') to++;
     // The last line of the note has no newline after it: take the one before it instead.
-    if (to === text.length && from > 0 && text[to - 1] !== '\n') return { from: from - 1, to, insert: '' };
-    return { from, to, insert: '' };
+    if (to === text.length && from > 0 && text[to - 1] !== '\n') return { from: from - 1, to };
+    return { from, to };
   });
+  ranges.sort((a, b) => a.from - b.from);
+  const merged: { from: number; to: number }[] = [];
+  for (const r of ranges) {
+    const prev = merged[merged.length - 1];
+    if (prev && r.from <= prev.to) prev.to = Math.max(prev.to, r.to);
+    else merged.push({ ...r });
+  }
+  return merged.map((r) => ({ from: r.from, to: r.to, insert: '' }));
+}
+
+/** Whether line `i` sits inside the archive section. */
+export function inArchive(lines: Line[], i: number, opts: ArchiveOptions): boolean {
+  const section = findSection(lines, skippedLines(lines), opts.heading, opts.level);
+  return !!section && i >= section.head && i < section.end;
 }
 
 /** Applies range edits written against `text`. */
@@ -287,6 +301,8 @@ export function planFor(text: string, lines: Line[], found: Block[], opts: Archi
   const insertion = planInsertion(text, blocks, opts);
   if (!insertion) return null;
   const removal = planRemoval(text, found, lines);
+  // Nothing but tasks in the note: the archive heading starts the note, with no blank lines before it.
+  if (applyChanges(text, removal).trim() === '' && insertion.from === text.length) insertion.insert = insertion.insert.replace(/^\n+/, '');
   return { changes: [...removal, insertion], count: found.length, blocks };
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { applyChanges, dedent, findCompleted, planInNote, splitLines, taskAround } from '../src/archive.ts';
+import { applyChanges, dedent, findCompleted, inArchive, planInNote, splitLines, taskAround } from '../src/archive.ts';
 import type { ArchiveOptions } from '../src/archive.ts';
 
 const O: ArchiveOptions = { doneMarkers: 'xX', heading: 'Archive', level: 2, dateHeading: '', includeNested: true };
@@ -37,9 +37,9 @@ test('tasks already archived are not archived again', () => {
 test('groups by date, reusing today\'s group', () => {
   const o = { dateHeading: '2026-10-08' };
   const first = run('- [x] a\n', o) ?? '';
-  assert.equal(first, '\n## Archive\n\n### 2026-10-08\n\n- [x] a\n');
+  assert.equal(first, '## Archive\n\n### 2026-10-08\n\n- [x] a\n');
   const again = run(`- [x] b\n${first}`, o);
-  assert.equal(again, "\n## Archive\n\n### 2026-10-08\n\n- [x] a\n- [x] b\n");
+  assert.equal(again, "## Archive\n\n### 2026-10-08\n\n- [x] a\n- [x] b\n");
   const other = run('- [x] new\n\n## Archive\n\n### 2026-10-07\n\n- [x] old\n', o);
   assert.equal(other, '\n## Archive\n\n### 2026-10-07\n\n- [x] old\n\n### 2026-10-08\n\n- [x] new\n');
 });
@@ -74,4 +74,14 @@ test('task at cursor: the line itself or the one that holds it', () => {
 
 test('dedent', () => {
   assert.deepEqual(dedent(['\t- [x] a', '\t\t- b']), ['- [x] a', '\t- b']);
+});
+
+test('adjacent blocks at the end of a note without a newline give one clean removal', () => {
+  const text = '- [x] a\n- [x] b';
+  assert.equal(run(text), '## Archive\n\n- [x] a\n- [x] b\n');
+});
+
+test('inArchive tells whether a line is under the archive heading', () => {
+  const lines = splitLines('- [ ] a\n## Archive\n- [x] b\n## Next\n- [x] c\n');
+  assert.deepEqual([0, 2, 4].map((i) => inArchive(lines, i, O)), [false, true, false]);
 });

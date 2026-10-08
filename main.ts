@@ -1,7 +1,7 @@
 import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile, moment, normalizePath } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
 
-import { applyChanges, findCompleted, planFor, planInsertion, planRemoval, splitLines, taskAround } from './src/archive.ts';
+import { applyChanges, findCompleted, inArchive, planFor, planInsertion, planRemoval, splitLines, taskAround } from './src/archive.ts';
 import type { ArchiveOptions, Block, Change } from './src/archive.ts';
 
 /** The part of moment this plugin uses, typed here: the directory's review has no types for `moment`. */
@@ -54,6 +54,9 @@ const TEXT = {
   dateFormat: { name: 'Date format', desc: 'For the date heading, for example YYYY-MM-DD.' },
 };
 
+const CHANGED = (other: string | null) =>
+  `The note changed while archiving. Nothing was removed from it${other ? `, but the tasks were already copied to “${other}”` : ''}; check for duplicates and run the command again.`;
+
 type Key = keyof TaskArchiveSettings;
 
 export default class TaskArchivePlugin extends Plugin {
@@ -102,9 +105,12 @@ export default class TaskArchivePlugin extends Plugin {
 
   /** The archive note, when one is set and it is not the note being archived. */
   private archivePath(file: TFile): string | null {
-    const p = normalizePath(this.settings.archiveNote.trim());
-    if (!this.settings.archiveNote.trim() || p === file.path) return null;
-    return p.endsWith('.md') ? p : `${p}.md`;
+    const raw = this.settings.archiveNote.trim();
+    if (!raw) return null;
+    const p = normalizePath(raw);
+    const path = p.toLowerCase().endsWith('.md') ? p : `${p}.md`;
+    // The note being archived is the archive note: archive inside it, as with no setting.
+    return path.toLowerCase() === file.path.toLowerCase() ? null : path;
   }
 
   private fromActive(what: 'completed' | 'task') {
@@ -130,6 +136,10 @@ export default class TaskArchivePlugin extends Plugin {
         found = block ? [block] : [];
         if (!block) {
           new Notice('Click inside a task first.');
+          return;
+        }
+        if (inArchive(lines, block.start, opts)) {
+          new Notice('That task is already in the archive.');
           return;
         }
       } else {
@@ -162,7 +172,7 @@ export default class TaskArchivePlugin extends Plugin {
 
       if (editor) {
         if (editor.getValue() !== text) {
-          new Notice('The note changed while archiving. Nothing was removed from it; run the command again.');
+          new Notice(CHANGED(other));
           return;
         }
         editor.transaction({
@@ -178,7 +188,7 @@ export default class TaskArchivePlugin extends Plugin {
           return applyChanges(data, changes);
         });
         if (!changed) {
-          new Notice('The note changed while archiving. Nothing was removed from it; run the command again.');
+          new Notice(CHANGED(other));
           return;
         }
       }
