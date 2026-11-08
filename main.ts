@@ -3,6 +3,7 @@ import type { SettingDefinitionItem } from 'obsidian';
 
 import { applyChanges, findCompleted, inArchive, planFor, planInsertion, planRemoval, splitLines, taskAround } from './src/archive.ts';
 import type { ArchiveOptions, Block, Change } from './src/archive.ts';
+import { moreDefinitions, renderMore } from './src/more-link.ts';
 
 /** The part of moment this plugin uses, typed here: the directory's review has no types for `moment`. */
 interface Day {
@@ -256,6 +257,7 @@ class TaskArchiveSettingTab extends PluginSettingTab {
           },
         ],
       },
+      ...(moreDefinitions() as SettingDefinitionItem[]),
     ];
   }
 
@@ -304,6 +306,7 @@ class TaskArchiveSettingTab extends PluginSettingTab {
         }),
       );
     if (s.groupByDate) this.text('dateFormat');
+    renderMore(this.containerEl, (el) => new Setting(el));
   }
 
   private text(key: 'doneMarkers' | 'archiveNote' | 'heading' | 'dateFormat') {
